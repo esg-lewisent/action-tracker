@@ -1,11 +1,12 @@
-import { useState, useCallback } from 'react'
+import { useState } from 'react'
 import {
   DndContext,
   PointerSensor,
   useSensor,
   useSensors,
   DragOverlay,
-  useDroppable
+  useDroppable,
+  useDraggable
 } from '@dnd-kit/core'
 import { supabase } from '../supabase'
 import CardModal from './CardModal'
@@ -119,14 +120,17 @@ function MultiSelect({ label, options, selected, onChange, onDelete }) {
 }
 
 function DraggableCard({ action, onClick }) {
-  const [dragging, setDragging] = useState(false)
   const status = getDateStatus(action.due_date)
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: action.id })
 
   return (
     <div
-      className={`card ${status} ${dragging ? 'dragging' : ''}`}
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      className={`card ${status} ${isDragging ? 'dragging' : ''}`}
       onClick={onClick}
-      data-id={action.id}
+      style={{ opacity: isDragging ? 0.3 : 1, cursor: 'grab' }}
     >
       <div className="card-title">{action.title}</div>
       <div className="card-tags">
