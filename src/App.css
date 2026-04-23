@@ -156,3 +156,14 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .multiselect-clear { padding: 6px 10px; font-size: 12px; color: var(--brand); cursor: pointer; font-weight: 600; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
 .multiselect-clear:hover { background: var(--bg); }
 .multiselect-empty { padding: 8px 10px; font-size: 12px; color: var(--text-muted); }
+
+.multiselect-option-row { display: flex; align-items: center; justify-content: space-between; border-radius: 5px; padding-right: 4px; }
+.multiselect-option-row:hover { background: var(--bg); }
+.multiselect-option-row .multiselect-option { flex: 1; }
+.multiselect-option-row .multiselect-option:hover { background: none; }
+.option-delete-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 11px; padding: 2px 4px; border-radius: 3px; flex-shrink: 0; }
+.option-delete-btn:hover { background: var(--red-bg); color: var(--red); }
+.delete-confirm { padding: 12px; }
+.delete-confirm-text { font-size: 13px; color: var(--text); line-height: 1.5; margin-bottom: 12px; }
+.delete-confirm-actions { display: flex; gap: 8px; }
+.btn-danger.small { padding: 5px 12px; font-size: 12px; }
