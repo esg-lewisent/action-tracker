@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { supabase } from '../supabase'
 
-export default function CardModal({ action, owners, onClose, onUpdate }) {
+export default function CardModal({ action, owners, clients, boards, onClose, onUpdate }) {
   const [title, setTitle] = useState(action.title)
   const [owner, setOwner] = useState(action.owner || '')
+  const [client, setClient] = useState(action.client || '')
   const [dueDate, setDueDate] = useState(action.due_date || '')
   const [status, setStatus] = useState(action.status)
   const [comments, setComments] = useState(action.comments || '')
+  const [boardName, setBoardName] = useState(action.board_name || '')
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
@@ -15,9 +17,11 @@ export default function CardModal({ action, owners, onClose, onUpdate }) {
     await supabase.from('actions').update({
       title,
       owner,
+      client,
       due_date: dueDate || null,
       status,
-      comments
+      comments,
+      board_name: boardName || null
     }).eq('id', action.id)
     setSaving(false)
     onUpdate()
@@ -32,6 +36,8 @@ export default function CardModal({ action, owners, onClose, onUpdate }) {
   }
 
   const ownerOptions = [...new Set([...owners, owner].filter(Boolean))]
+  const clientOptions = [...new Set([...clients, client].filter(Boolean))]
+  const boardOptions = [...new Set([...(boards || []).map(b => b.name), boardName].filter(Boolean))]
 
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -46,19 +52,25 @@ export default function CardModal({ action, owners, onClose, onUpdate }) {
         <div className="field-row">
           <div className="field">
             <label>Owner</label>
-            <input
-              list="owner-list"
-              value={owner}
-              onChange={e => setOwner(e.target.value)}
-              placeholder="Type a name"
-            />
-            <datalist id="owner-list">
-              {ownerOptions.map(o => <option key={o} value={o} />)}
-            </datalist>
+            <input list="owner-list" value={owner} onChange={e => setOwner(e.target.value)} placeholder="Type a name" />
+            <datalist id="owner-list">{ownerOptions.map(o => <option key={o} value={o} />)}</datalist>
           </div>
           <div className="field">
             <label>Due Date</label>
             <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} />
+          </div>
+        </div>
+
+        <div className="field-row">
+          <div className="field">
+            <label>Client</label>
+            <input list="client-list" value={client} onChange={e => setClient(e.target.value)} placeholder="Client name" />
+            <datalist id="client-list">{clientOptions.map(o => <option key={o} value={o} />)}</datalist>
+          </div>
+          <div className="field">
+            <label>Board</label>
+            <input list="board-list" value={boardName} onChange={e => setBoardName(e.target.value)} placeholder="Board name" />
+            <datalist id="board-list">{boardOptions.map(o => <option key={o} value={o} />)}</datalist>
           </div>
         </div>
 
