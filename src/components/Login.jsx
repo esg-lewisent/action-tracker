@@ -29,7 +29,7 @@ export default function Login() {
   return (
     <div className="login-screen">
       <div className="login-card">
-        <div className="login-logo">Action<span>Track</span></div>
+        <div className="login-logo">Action <span>Tracker</span></div>
         <p className="login-subtitle">Meeting actions, tracked and shared.</p>
         <form onSubmit={handleSubmit} className="login-form">
           <div className="field">
