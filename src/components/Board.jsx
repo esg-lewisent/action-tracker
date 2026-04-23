@@ -110,20 +110,30 @@ function MultiSelect({ label, options, selected, onChange, onDelete }) {
   )
 }
 
-function Card({ action, onClick, onDragStart }) {
+function Card({ action, onClick }) {
   const status = getDateStatus(action.due_date)
+
   return (
     <div
       className={`card ${status}`}
       draggable
       onDragStart={e => {
+        // Set a custom drag image so the card doesn't go transparent
+        const clone = e.target.cloneNode(true)
+        clone.style.position = 'absolute'
+        clone.style.top = '-1000px'
+        clone.style.width = e.target.offsetWidth + 'px'
+        clone.style.transform = 'rotate(1deg)'
+        clone.style.boxShadow = '0 8px 24px rgba(0,0,0,0.15)'
+        document.body.appendChild(clone)
+        e.dataTransfer.setDragImage(clone, e.nativeEvent.offsetX, e.nativeEvent.offsetY)
+        setTimeout(() => document.body.removeChild(clone), 0)
+
         e.dataTransfer.setData('actionId', action.id)
         e.dataTransfer.setData('currentStatus', action.status)
         e.dataTransfer.effectAllowed = 'move'
-        onDragStart && onDragStart()
-        setTimeout(() => e.target.classList.add('dragging'), 0)
       }}
-      onDragEnd={e => e.target.classList.remove('dragging')}
+      onDragEnd={e => {}}
       onClick={onClick}
     >
       <div className="card-title">{action.title}</div>
