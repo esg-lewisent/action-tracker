@@ -1,18 +1,12 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import {
   DndContext,
-  closestCenter,
   PointerSensor,
   useSensor,
   useSensors,
-  DragOverlay
+  DragOverlay,
+  useDroppable
 } from '@dnd-kit/core'
-import {
-  SortableContext,
-  verticalListSortingStrategy,
-  useSortable
-} from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
 import { supabase } from '../supabase'
 import CardModal from './CardModal'
 
@@ -124,24 +118,15 @@ function MultiSelect({ label, options, selected, onChange, onDelete }) {
   )
 }
 
-function CardItem({ action, onClick, isDragOverlay = false }) {
+function DraggableCard({ action, onClick }) {
+  const [dragging, setDragging] = useState(false)
   const status = getDateStatus(action.due_date)
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: action.id })
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.3 : 1,
-  }
 
   return (
     <div
-      ref={setNodeRef}
-      style={isDragOverlay ? {} : style}
-      {...attributes}
-      {...listeners}
-      className={`card ${status} ${isDragOverlay ? 'dragging' : ''}`}
+      className={`card ${status} ${dragging ? 'dragging' : ''}`}
       onClick={onClick}
+      data-id={action.id}
     >
       <div className="card-title">{action.title}</div>
       <div className="card-tags">
@@ -164,18 +149,42 @@ function CardItem({ action, onClick, isDragOverlay = false }) {
   )
 }
 
-function Column({ id, label, items, onCardClick }) {
+function CardOverlay({ action }) {
+  const status = getDateStatus(action.due_date)
   return (
-    <div className={`column ${id === 'done' ? 'done-column' : ''}`}>
+    <div className={`card ${status} dragging`} style={{ cursor: 'grabbing', boxShadow: '0 8px 24px rgba(0,0,0,0.18)' }}>
+      <div className="card-title">{action.title}</div>
+      <div className="card-tags">
+        {action.board_name && <span className="card-tag tag-board">{action.board_name}</span>}
+        {action.client && <span className="card-tag tag-client">{action.client}</span>}
+      </div>
+      <div className="card-meta">
+        <div className="card-owner">
+          <div className="owner-dot" style={{ background: ownerColor(action.owner) }}>
+            {getInitials(action.owner)}
+          </div>
+          <span>{action.owner || 'Unassigned'}</span>
+        </div>
+        {action.due_date && (
+          <span className={`card-date ${status}`}>{formatDate(action.due_date)}</span>
+        )}
+      </div>
+      {action.comments && <div className="card-comment">{action.comments}</div>}
+    </div>
+  )
+}
+
+function DroppableColumn({ id, label, items, onCardClick, isOver }) {
+  const { setNodeRef } = useDroppable({ id })
+  return (
+    <div ref={setNodeRef} className={`column ${id === 'done' ? 'done-column' : ''} ${isOver ? 'drag-over' : ''}`}>
       <div className="column-header">
         <span className="column-title">{label}</span>
         <span className="column-count">{items.length}</span>
       </div>
-      <SortableContext items={items.map(a => a.id)} strategy={verticalListSortingStrategy}>
-        {items.map(action => (
-          <CardItem key={action.id} action={action} onClick={() => onCardClick(action)} />
-        ))}
-      </SortableContext>
+      {items.map(action => (
+        <DraggableCard key={action.id} action={action} onClick={() => onCardClick(action)} />
+      ))}
     </div>
   )
 }
@@ -186,9 +195,10 @@ export default function Board({ actions, boards, onUpdate, onDragStateChange, cu
   const [clientFilters, setClientFilters] = useState([])
   const [boardFilters, setBoardFilters] = useState([])
   const [activeCard, setActiveCard] = useState(null)
+  const [overColumn, setOverColumn] = useState(null)
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   )
 
   const owners = [...new Set(actions.map(a => a.owner).filter(Boolean))].sort()
@@ -202,8 +212,12 @@ export default function Board({ actions, boards, onUpdate, onDragStateChange, cu
     return true
   })
 
-  const todo = filtered.filter(a => a.status === 'todo')
-  const done = filtered.filter(a => a.status === 'done')
+  const localActions = activeCard
+    ? filtered.map(a => a.id === activeCard.id ? { ...a, status: overColumn || a.status } : a)
+    : filtered
+
+  const todo = localActions.filter(a => a.status === 'todo')
+  const done = localActions.filter(a => a.status === 'done')
   const activeFilterCount = ownerFilters.length + clientFilters.length + boardFilters.length
 
   function handleDragStart(event) {
@@ -212,22 +226,23 @@ export default function Board({ actions, boards, onUpdate, onDragStateChange, cu
     onDragStateChange(true)
   }
 
+  function handleDragOver(event) {
+    const { over } = event
+    if (over) setOverColumn(over.id)
+  }
+
   async function handleDragEnd(event) {
     const { active, over } = event
+    const card = activeCard
     setActiveCard(null)
+    setOverColumn(null)
     onDragStateChange(false)
-    if (!over) return
 
-    const activeAction = actions.find(a => a.id === active.id)
-    if (!activeAction) return
+    if (!over || !card) return
 
-    const overId = over.id
-    const newStatus = overId === 'todo' || overId === 'done'
-      ? overId
-      : actions.find(a => a.id === overId)?.status
-
-    if (newStatus && newStatus !== activeAction.status) {
-      await supabase.from('actions').update({ status: newStatus }).eq('id', active.id)
+    const newStatus = over.id
+    if ((newStatus === 'todo' || newStatus === 'done') && newStatus !== card.status) {
+      await supabase.from('actions').update({ status: newStatus }).eq('id', card.id)
       onUpdate()
     }
   }
@@ -255,29 +270,4 @@ export default function Board({ actions, boards, onUpdate, onDragStateChange, cu
 
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-      >
-        <div className="board">
-          <Column id="todo" label="To Do" items={todo} onCardClick={setSelectedAction} />
-          <Column id="done" label="Done" items={done} onCardClick={setSelectedAction} />
-        </div>
-        <DragOverlay>
-          {activeCard ? <CardItem action={activeCard} isDragOverlay /> : null}
-        </DragOverlay>
-      </DndContext>
-
-      {selectedAction && (
-        <CardModal
-          action={selectedAction}
-          owners={owners}
-          clients={clients}
-          boards={boards}
-          onClose={() => setSelectedAction(null)}
-          onUpdate={() => { onUpdate(); setSelectedAction(null) }}
-        />
-      )}
-    </div>
-  )
-}
+        onDragStart={handleD
