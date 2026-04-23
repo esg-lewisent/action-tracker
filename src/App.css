@@ -167,3 +167,6 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .delete-confirm-text { font-size: 13px; color: var(--text); line-height: 1.5; margin-bottom: 12px; }
 .delete-confirm-actions { display: flex; gap: 8px; }
 .btn-danger.small { padding: 5px 12px; font-size: 12px; }
+
+.nav-logo { display: flex; align-items: center; gap: 10px; }
+.nav-logo-img { height: 28px; width: auto; }
