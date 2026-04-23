@@ -1,13 +1,4 @@
-import { useState } from 'react'
-import {
-  DndContext,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragOverlay,
-  useDroppable,
-  useDraggable
-} from '@dnd-kit/core'
+import { useState, useRef } from 'react'
 import { supabase } from '../supabase'
 import CardModal from './CardModal'
 
@@ -119,18 +110,21 @@ function MultiSelect({ label, options, selected, onChange, onDelete }) {
   )
 }
 
-function DraggableCard({ action, onClick }) {
+function Card({ action, onClick, onDragStart }) {
   const status = getDateStatus(action.due_date)
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: action.id })
-
   return (
     <div
-      ref={setNodeRef}
-      {...listeners}
-      {...attributes}
-      className={`card ${status} ${isDragging ? 'dragging' : ''}`}
+      className={`card ${status}`}
+      draggable
+      onDragStart={e => {
+        e.dataTransfer.setData('actionId', action.id)
+        e.dataTransfer.setData('currentStatus', action.status)
+        e.dataTransfer.effectAllowed = 'move'
+        onDragStart && onDragStart()
+        setTimeout(() => e.target.classList.add('dragging'), 0)
+      }}
+      onDragEnd={e => e.target.classList.remove('dragging')}
       onClick={onClick}
-      style={{ opacity: isDragging ? 0.3 : 1, cursor: 'grab' }}
     >
       <div className="card-title">{action.title}</div>
       <div className="card-tags">
@@ -153,41 +147,28 @@ function DraggableCard({ action, onClick }) {
   )
 }
 
-function CardOverlay({ action }) {
-  const status = getDateStatus(action.due_date)
-  return (
-    <div className={`card ${status} dragging`} style={{ cursor: 'grabbing', boxShadow: '0 8px 24px rgba(0,0,0,0.18)' }}>
-      <div className="card-title">{action.title}</div>
-      <div className="card-tags">
-        {action.board_name && <span className="card-tag tag-board">{action.board_name}</span>}
-        {action.client && <span className="card-tag tag-client">{action.client}</span>}
-      </div>
-      <div className="card-meta">
-        <div className="card-owner">
-          <div className="owner-dot" style={{ background: ownerColor(action.owner) }}>
-            {getInitials(action.owner)}
-          </div>
-          <span>{action.owner || 'Unassigned'}</span>
-        </div>
-        {action.due_date && (
-          <span className={`card-date ${status}`}>{formatDate(action.due_date)}</span>
-        )}
-      </div>
-      {action.comments && <div className="card-comment">{action.comments}</div>}
-    </div>
-  )
-}
+function Column({ id, label, items, onCardClick, onDrop }) {
+  const [isOver, setIsOver] = useState(false)
 
-function DroppableColumn({ id, label, items, onCardClick, isOver }) {
-  const { setNodeRef } = useDroppable({ id })
   return (
-    <div ref={setNodeRef} className={`column ${id === 'done' ? 'done-column' : ''} ${isOver ? 'drag-over' : ''}`}>
+    <div
+      className={`column ${id === 'done' ? 'done-column' : ''} ${isOver ? 'drag-over' : ''}`}
+      onDragOver={e => { e.preventDefault(); setIsOver(true) }}
+      onDragLeave={() => setIsOver(false)}
+      onDrop={e => {
+        e.preventDefault()
+        setIsOver(false)
+        const actionId = e.dataTransfer.getData('actionId')
+        const currentStatus = e.dataTransfer.getData('currentStatus')
+        if (actionId && currentStatus !== id) onDrop(actionId, id)
+      }}
+    >
       <div className="column-header">
         <span className="column-title">{label}</span>
         <span className="column-count">{items.length}</span>
       </div>
       {items.map(action => (
-        <DraggableCard key={action.id} action={action} onClick={() => onCardClick(action)} />
+        <Card key={action.id} action={action} onClick={() => onCardClick(action)} />
       ))}
     </div>
   )
@@ -198,12 +179,6 @@ export default function Board({ actions, boards, onUpdate, onDragStateChange, cu
   const [ownerFilters, setOwnerFilters] = useState([])
   const [clientFilters, setClientFilters] = useState([])
   const [boardFilters, setBoardFilters] = useState([])
-  const [activeCard, setActiveCard] = useState(null)
-  const [overColumn, setOverColumn] = useState(null)
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
-  )
 
   const owners = [...new Set(actions.map(a => a.owner).filter(Boolean))].sort()
   const clients = [...new Set(actions.map(a => a.client).filter(Boolean))].sort()
@@ -216,39 +191,14 @@ export default function Board({ actions, boards, onUpdate, onDragStateChange, cu
     return true
   })
 
-  const localActions = activeCard
-    ? filtered.map(a => a.id === activeCard.id ? { ...a, status: overColumn || a.status } : a)
-    : filtered
-
-  const todo = localActions.filter(a => a.status === 'todo')
-  const done = localActions.filter(a => a.status === 'done')
+  const todo = filtered.filter(a => a.status === 'todo')
+  const done = filtered.filter(a => a.status === 'done')
   const activeFilterCount = ownerFilters.length + clientFilters.length + boardFilters.length
 
-  function handleDragStart(event) {
-    const card = actions.find(a => a.id === event.active.id)
-    setActiveCard(card)
-    onDragStateChange(true)
-  }
-
-  function handleDragOver(event) {
-    const { over } = event
-    if (over) setOverColumn(over.id)
-  }
-
-  async function handleDragEnd(event) {
-    const { active, over } = event
-    const card = activeCard
-    setActiveCard(null)
-    setOverColumn(null)
-    onDragStateChange(false)
-
-    if (!over || !card) return
-
-    const newStatus = over.id
-    if ((newStatus === 'todo' || newStatus === 'done') && newStatus !== card.status) {
-      await supabase.from('actions').update({ status: newStatus }).eq('id', card.id)
-      onUpdate()
-    }
+  async function handleDrop(actionId, newStatus) {
+    onDragStateChange && onDragStateChange(false)
+    await supabase.from('actions').update({ status: newStatus }).eq('id', actionId)
+    onUpdate()
   }
 
   async function handleDeleteBoard(boardName) {
@@ -272,20 +222,10 @@ export default function Board({ actions, boards, onUpdate, onDragStateChange, cu
         </div>
       </div>
 
-      <DndContext
-        sensors={sensors}
-        onDragStart={handleDragStart}
-        onDragOver={handleDragOver}
-        onDragEnd={handleDragEnd}
-      >
-        <div className="board">
-          <DroppableColumn id="todo" label="To Do" items={todo} onCardClick={setSelectedAction} isOver={overColumn === 'todo'} />
-          <DroppableColumn id="done" label="Done" items={done} onCardClick={setSelectedAction} isOver={overColumn === 'done'} />
-        </div>
-        <DragOverlay dropAnimation={null}>
-          {activeCard ? <CardOverlay action={activeCard} /> : null}
-        </DragOverlay>
-      </DndContext>
+      <div className="board">
+        <Column id="todo" label="To Do" items={todo} onCardClick={setSelectedAction} onDrop={handleDrop} />
+        <Column id="done" label="Done" items={done} onCardClick={setSelectedAction} onDrop={handleDrop} />
+      </div>
 
       {selectedAction && (
         <CardModal
