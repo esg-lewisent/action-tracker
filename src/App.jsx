@@ -60,7 +60,7 @@ export default function App() {
   return (
     <div className="app">
       <nav className="nav">
-        <div className="nav-logo">Action<span>Track</span></div>
+        <div className="nav-logo">Action <span>Tracker</span></div>
         <div className="nav-center">
           <div className="nav-tabs">
             <button className={`nav-tab ${view === 'board' ? 'active' : ''}`} onClick={() => setView('board')}>Board</button>
