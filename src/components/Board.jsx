@@ -33,13 +33,35 @@ function ownerColor(name) {
   return OWNER_COLORS[Math.abs(hash) % OWNER_COLORS.length]
 }
 
-function MultiSelect({ label, options, selected, onChange }) {
+function MultiSelect({ label, options, selected, onChange, onDelete }) {
   const [open, setOpen] = useState(false)
+  const [hoveredOption, setHoveredOption] = useState(null)
+  const [confirmDelete, setConfirmDelete] = useState(null)
+
   const toggle = (val) => {
     if (selected.includes(val)) onChange(selected.filter(v => v !== val))
     else onChange([...selected, val])
   }
+
   const displayLabel = selected.length === 0 ? 'All' : selected.length === 1 ? selected[0] : `${selected.length} selected`
+
+  function handleDeleteClick(e, option) {
+    e.stopPropagation()
+    setConfirmDelete(option)
+  }
+
+  function handleConfirmDelete(e) {
+    e.stopPropagation()
+    onDelete(confirmDelete)
+    setConfirmDelete(null)
+    setOpen(false)
+  }
+
+  function handleCancelDelete(e) {
+    e.stopPropagation()
+    setConfirmDelete(null)
+  }
+
   return (
     <div className="multiselect" style={{ position: 'relative' }}>
       <button className="multiselect-btn" onClick={() => setOpen(!open)}>
@@ -48,18 +70,40 @@ function MultiSelect({ label, options, selected, onChange }) {
       </button>
       {open && (
         <>
-          <div className="multiselect-backdrop" onClick={() => setOpen(false)} />
+          <div className="multiselect-backdrop" onClick={() => { setOpen(false); setConfirmDelete(null) }} />
           <div className="multiselect-dropdown">
-            {selected.length > 0 && (
-              <div className="multiselect-clear" onClick={() => { onChange([]); setOpen(false) }}>Clear all</div>
+            {confirmDelete ? (
+              <div className="delete-confirm">
+                <p className="delete-confirm-text">Delete <strong>{confirmDelete}</strong>? This will delete all actions in this board. You cannot undo this.</p>
+                <div className="delete-confirm-actions">
+                  <button className="btn-danger small" onClick={handleConfirmDelete}>Yes, delete</button>
+                  <button className="btn-secondary small" onClick={handleCancelDelete}>Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <>
+                {selected.length > 0 && (
+                  <div className="multiselect-clear" onClick={() => { onChange([]); setOpen(false) }}>Clear all</div>
+                )}
+                {options.map(o => (
+                  <div
+                    key={o}
+                    className="multiselect-option-row"
+                    onMouseEnter={() => setHoveredOption(o)}
+                    onMouseLeave={() => setHoveredOption(null)}
+                  >
+                    <label className="multiselect-option">
+                      <input type="checkbox" checked={selected.includes(o)} onChange={() => toggle(o)} />
+                      {o}
+                    </label>
+                    {onDelete && hoveredOption === o && (
+                      <button className="option-delete-btn" onClick={e => handleDeleteClick(e, o)} title="Delete board">✕</button>
+                    )}
+                  </div>
+                ))}
+                {options.length === 0 && <div className="multiselect-empty">No options</div>}
+              </>
             )}
-            {options.map(o => (
-              <label key={o} className="multiselect-option">
-                <input type="checkbox" checked={selected.includes(o)} onChange={() => toggle(o)} />
-                {o}
-              </label>
-            ))}
-            {options.length === 0 && <div className="multiselect-empty">No options</div>}
           </div>
         </>
       )}
@@ -97,6 +141,15 @@ export default function Board({ actions, boards, onUpdate, currentUser }) {
     onUpdate()
   }
 
+  async function handleDeleteBoard(boardName) {
+    await supabase.from('actions').delete().eq('board_name', boardName)
+    await supabase.from('boards').delete().eq('name', boardName)
+    setBoardFilters(prev => prev.filter(b => b !== boardName))
+    onUpdate()
+  }
+
+  return (
+    <div className="board-container">
   return (
     <div className="board-container">
       <div className="board-header">
@@ -105,7 +158,7 @@ export default function Board({ actions, boards, onUpdate, currentUser }) {
           <p className="board-meta">{todo.length} open · {done.length} done{activeFilterCount > 0 ? ` · ${activeFilterCount} filter${activeFilterCount !== 1 ? 's' : ''} active` : ''}</p>
         </div>
         <div className="filter-bar">
-          <MultiSelect label="Board" options={boardNames} selected={boardFilters} onChange={setBoardFilters} />
+          <MultiSelect label="Board" options={boardNames} selected={boardFilters} onChange={setBoardFilters} onDelete={handleDeleteBoard} />
           <MultiSelect label="Client" options={clients} selected={clientFilters} onChange={setClientFilters} />
           <MultiSelect label="Owner" options={owners} selected={ownerFilters} onChange={setOwnerFilters} />
         </div>
