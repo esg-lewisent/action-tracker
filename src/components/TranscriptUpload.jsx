@@ -47,7 +47,6 @@ Example output:
               content: `Extract all action items from this meeting transcript:\n\n${transcript}`
             }
           ],
-          temperature: 0.2
         })
       })
 
