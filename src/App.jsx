@@ -62,7 +62,7 @@ export default function App() {
       <nav className="nav">
         <div className="nav-logo">
   <img src="/logo.svg" alt="ESG" className="nav-logo-img" />
-  Action <span>Tracker</span>
+  Action<span>Tracker</span>
 </div>
         <div className="nav-center">
           <div className="nav-tabs">
