@@ -112,4 +112,10 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .login-logo { font-size: 22px; font-weight: 700; margin-bottom: 6px; letter-spacing: -0.3px; }
 .login-logo span { color: var(--brand); }
 .login-subtitle { font-size: 13px; color: var(--text-muted); margin-bottom: 28px; }
-.toggle-auth { m
+.toggle-auth { margin-top: 16px; font-size: 13px; color: var(--brand); background: none; border: none; cursor: pointer; text-align: center; display: block; width: 100%; }
+
+.error-msg { background: var(--red-bg); color: var(--red); border-radius: 6px; padding: 10px 14px; font-size: 13px; margin-bottom: 14px; }
+.success-msg { background: var(--green-bg); color: var(--green); border-radius: 6px; padding: 10px 14px; font-size: 13px; margin-bottom: 14px; }
+.loading-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+.loading-spinner { width: 32px; height: 32px; border: 3px solid var(--border); border-top-color: var(--brand); border-radius: 50%; animation: spin 0.7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
