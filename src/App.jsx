@@ -9,6 +9,7 @@ export default function App() {
   const [session, setSession] = useState(null)
   const [view, setView] = useState('board')
   const [actions, setActions] = useState([])
+  const [boards, setBoards] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -25,33 +26,30 @@ export default function App() {
   useEffect(() => {
     if (!session) return
     fetchActions()
+    fetchBoards()
     const channel = supabase
       .channel('actions-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'actions' }, () => {
-        fetchActions()
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'actions' }, () => fetchActions())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'boards' }, () => fetchBoards())
       .subscribe()
     return () => supabase.removeChannel(channel)
   }, [session])
 
   async function fetchActions() {
-    const { data, error } = await supabase
-      .from('actions')
-      .select('*')
-      .order('created_at', { ascending: false })
+    const { data, error } = await supabase.from('actions').select('*').order('created_at', { ascending: false })
     if (!error) setActions(data)
+  }
+
+  async function fetchBoards() {
+    const { data } = await supabase.from('boards').select('*').order('name')
+    if (data) setBoards(data)
   }
 
   async function handleSignOut() {
     await supabase.auth.signOut()
   }
 
-  if (loading) return (
-    <div className="loading-screen">
-      <div className="loading-spinner" />
-    </div>
-  )
-
+  if (loading) return <div className="loading-screen"><div className="loading-spinner" /></div>
   if (!session) return <Login />
 
   const userInitials = session.user.email.slice(0, 2).toUpperCase()
@@ -72,12 +70,8 @@ export default function App() {
         </div>
       </nav>
 
-      {view === 'board' && (
-        <Board actions={actions} onUpdate={fetchActions} currentUser={session.user} />
-      )}
-      {view === 'transcript' && (
-        <TranscriptUpload onDone={() => { fetchActions(); setView('board') }} currentUser={session.user} />
-      )}
+      {view === 'board' && <Board actions={actions} boards={boards} onUpdate={fetchActions} currentUser={session.user} />}
+      {view === 'transcript' && <TranscriptUpload onDone={() => { fetchActions(); setView('board') }} currentUser={session.user} />}
     </div>
   )
 }
