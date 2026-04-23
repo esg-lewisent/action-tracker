@@ -121,9 +121,9 @@ function Card({ action, onClick, onDragStart }) {
         e.dataTransfer.setData('currentStatus', action.status)
         e.dataTransfer.effectAllowed = 'move'
         onDragStart && onDragStart()
-        setTimeout(() => e.target.style.opacity = '1', 0)
+        setTimeout(() => e.target.classList.add('dragging'), 0)
       }}
-      onDragEnd={e => e.target.style.opacity = '1'}
+      onDragEnd={e => e.target.classList.remove('dragging')}
       onClick={onClick}
     >
       <div className="card-title">{action.title}</div>
