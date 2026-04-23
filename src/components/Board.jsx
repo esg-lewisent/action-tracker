@@ -150,8 +150,6 @@ export default function Board({ actions, boards, onUpdate, currentUser }) {
 
   return (
     <div className="board-container">
-  return (
-    <div className="board-container">
       <div className="board-header">
         <div>
           <h1 className="board-title">Action Tracker</h1>
