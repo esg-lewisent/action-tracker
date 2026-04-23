@@ -33,22 +33,67 @@ function ownerColor(name) {
   return OWNER_COLORS[Math.abs(hash) % OWNER_COLORS.length]
 }
 
-export default function Board({ actions, onUpdate, currentUser }) {
+function MultiSelect({ label, options, selected, onChange }) {
+  const [open, setOpen] = useState(false)
+  const toggle = (val) => {
+    if (selected.includes(val)) onChange(selected.filter(v => v !== val))
+    else onChange([...selected, val])
+  }
+  const displayLabel = selected.length === 0 ? 'All' : selected.length === 1 ? selected[0] : `${selected.length} selected`
+  return (
+    <div className="multiselect" style={{ position: 'relative' }}>
+      <button className="multiselect-btn" onClick={() => setOpen(!open)}>
+        <span>{label}: <strong>{displayLabel}</strong></span>
+        <span className="multiselect-arrow">{open ? '▲' : '▼'}</span>
+      </button>
+      {open && (
+        <>
+          <div className="multiselect-backdrop" onClick={() => setOpen(false)} />
+          <div className="multiselect-dropdown">
+            {selected.length > 0 && (
+              <div className="multiselect-clear" onClick={() => { onChange([]); setOpen(false) }}>Clear all</div>
+            )}
+            {options.map(o => (
+              <label key={o} className="multiselect-option">
+                <input type="checkbox" checked={selected.includes(o)} onChange={() => toggle(o)} />
+                {o}
+              </label>
+            ))}
+            {options.length === 0 && <div className="multiselect-empty">No options</div>}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+export default function Board({ actions, boards, onUpdate, currentUser }) {
   const [selectedAction, setSelectedAction] = useState(null)
-  const [ownerFilter, setOwnerFilter] = useState('all')
+  const [ownerFilters, setOwnerFilters] = useState([])
+  const [clientFilters, setClientFilters] = useState([])
+  const [boardFilters, setBoardFilters] = useState([])
 
-  const owners = [...new Set(actions.map(a => a.owner).filter(Boolean))]
+  const owners = [...new Set(actions.map(a => a.owner).filter(Boolean))].sort()
+  const clients = [...new Set(actions.map(a => a.client).filter(Boolean))].sort()
+  const boardNames = [...new Set(actions.map(a => a.board_name).filter(Boolean))].sort()
 
-  const filtered = ownerFilter === 'all' ? actions : actions.filter(a => a.owner === ownerFilter)
+  const filtered = actions.filter(a => {
+    if (ownerFilters.length > 0 && !ownerFilters.includes(a.owner)) return false
+    if (clientFilters.length > 0 && !clientFilters.includes(a.client)) return false
+    if (boardFilters.length > 0 && !boardFilters.includes(a.board_name)) return false
+    return true
+  })
+
   const todo = filtered.filter(a => a.status === 'todo')
   const done = filtered.filter(a => a.status === 'done')
+
+  const activeFilterCount = ownerFilters.length + clientFilters.length + boardFilters.length
 
   async function onDragEnd(result) {
     const { destination, source, draggableId } = result
     if (!destination) return
     if (destination.droppableId === source.droppableId) return
-    const newStatus = destination.droppableId
-    await supabase.from('actions').update({ status: newStatus }).eq('id', draggableId)
+    await supabase.from('actions').update({ status: destination.droppableId }).eq('id', draggableId)
     onUpdate()
   }
 
@@ -57,14 +102,12 @@ export default function Board({ actions, onUpdate, currentUser }) {
       <div className="board-header">
         <div>
           <h1 className="board-title">Action Tracker</h1>
-          <p className="board-meta">{todo.length} open · {done.length} done</p>
+          <p className="board-meta">{todo.length} open · {done.length} done{activeFilterCount > 0 ? ` · ${activeFilterCount} filter${activeFilterCount !== 1 ? 's' : ''} active` : ''}</p>
         </div>
         <div className="filter-bar">
-          <label className="filter-label">Owner</label>
-          <select className="filter-select" value={ownerFilter} onChange={e => setOwnerFilter(e.target.value)}>
-            <option value="all">All</option>
-            {owners.map(o => <option key={o} value={o}>{o}</option>)}
-          </select>
+          <MultiSelect label="Board" options={boardNames} selected={boardFilters} onChange={setBoardFilters} />
+          <MultiSelect label="Client" options={clients} selected={clientFilters} onChange={setClientFilters} />
+          <MultiSelect label="Owner" options={owners} selected={ownerFilters} onChange={setOwnerFilters} />
         </div>
       </div>
 
@@ -95,6 +138,14 @@ export default function Board({ actions, onUpdate, currentUser }) {
                             onClick={() => setSelectedAction(action)}
                           >
                             <div className="card-title">{action.title}</div>
+                            <div className="card-tags">
+                              {action.board_name && (
+                                <span className="card-tag tag-board">{action.board_name}</span>
+                              )}
+                              {action.client && (
+                                <span className="card-tag tag-client">{action.client}</span>
+                              )}
+                            </div>
                             <div className="card-meta">
                               <div className="card-owner">
                                 <div className="owner-dot" style={{ background: ownerColor(action.owner) }}>
@@ -126,6 +177,8 @@ export default function Board({ actions, onUpdate, currentUser }) {
         <CardModal
           action={selectedAction}
           owners={owners}
+          clients={clients}
+          boards={boards}
           onClose={() => setSelectedAction(null)}
           onUpdate={() => { onUpdate(); setSelectedAction(null) }}
         />
