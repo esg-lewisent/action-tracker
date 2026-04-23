@@ -3,8 +3,8 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --brand: #4f6ef7;
-  --brand-dark: #3d5ce5;
+  --brand: #0069B4;
+  --brand-dark: #005086;
   --bg: #f4f5f7;
   --surface: #fff;
   --border: #e0e4ef;
