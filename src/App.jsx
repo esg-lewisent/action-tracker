@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from './supabase'
 import Board from './components/Board'
 import TranscriptUpload from './components/TranscriptUpload'
@@ -11,6 +11,7 @@ export default function App() {
   const [actions, setActions] = useState([])
   const [boards, setBoards] = useState([])
   const [loading, setLoading] = useState(true)
+  const isDragging = useRef(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -29,7 +30,9 @@ export default function App() {
     fetchBoards()
     const channel = supabase
       .channel('actions-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'actions' }, () => fetchActions())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'actions' }, () => {
+        if (!isDragging.current) fetchActions()
+      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'boards' }, () => fetchBoards())
       .subscribe()
     return () => supabase.removeChannel(channel)
@@ -70,8 +73,18 @@ export default function App() {
         </div>
       </nav>
 
-      {view === 'board' && <Board actions={actions} boards={boards} onUpdate={fetchActions} currentUser={session.user} />}
-      {view === 'transcript' && <TranscriptUpload onDone={() => { fetchActions(); setView('board') }} currentUser={session.user} />}
+      {view === 'board' && (
+        <Board
+          actions={actions}
+          boards={boards}
+          onUpdate={fetchActions}
+          onDragStateChange={(dragging) => { isDragging.current = dragging }}
+          currentUser={session.user}
+        />
+      )}
+      {view === 'transcript' && (
+        <TranscriptUpload onDone={() => { fetchActions(); setView('board') }} currentUser={session.user} />
+      )}
     </div>
   )
 }
