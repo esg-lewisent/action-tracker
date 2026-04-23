@@ -180,7 +180,7 @@ function Column({ id, label, items, onCardClick }) {
   )
 }
 
-export default function Board({ actions, boards, onUpdate, currentUser }) {
+export default function Board({ actions, boards, onUpdate, onDragStateChange, currentUser }) {
   const [selectedAction, setSelectedAction] = useState(null)
   const [ownerFilters, setOwnerFilters] = useState([])
   const [clientFilters, setClientFilters] = useState([])
@@ -209,11 +209,13 @@ export default function Board({ actions, boards, onUpdate, currentUser }) {
   function handleDragStart(event) {
     const card = actions.find(a => a.id === event.active.id)
     setActiveCard(card)
+    onDragStateChange(true)
   }
 
   async function handleDragEnd(event) {
     const { active, over } = event
     setActiveCard(null)
+    onDragStateChange(false)
     if (!over) return
 
     const activeAction = actions.find(a => a.id === active.id)
