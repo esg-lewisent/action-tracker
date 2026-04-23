@@ -270,4 +270,29 @@ export default function Board({ actions, boards, onUpdate, onDragStateChange, cu
 
       <DndContext
         sensors={sensors}
-        onDragStart={handleD
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragEnd={handleDragEnd}
+      >
+        <div className="board">
+          <DroppableColumn id="todo" label="To Do" items={todo} onCardClick={setSelectedAction} isOver={overColumn === 'todo'} />
+          <DroppableColumn id="done" label="Done" items={done} onCardClick={setSelectedAction} isOver={overColumn === 'done'} />
+        </div>
+        <DragOverlay dropAnimation={null}>
+          {activeCard ? <CardOverlay action={activeCard} /> : null}
+        </DragOverlay>
+      </DndContext>
+
+      {selectedAction && (
+        <CardModal
+          action={selectedAction}
+          owners={owners}
+          clients={clients}
+          boards={boards}
+          onClose={() => setSelectedAction(null)}
+          onUpdate={() => { onUpdate(); setSelectedAction(null) }}
+        />
+      )}
+    </div>
+  )
+}
