@@ -1,5 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../supabase'
+
+function formatDate(dateStr) {
+  if (!dateStr) return '-'
+  const d = new Date(dateStr)
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+}
 
 export default function TranscriptUpload({ onDone, currentUser }) {
   const [transcript, setTranscript] = useState('')
@@ -8,12 +14,23 @@ export default function TranscriptUpload({ onDone, currentUser }) {
   const [extracted, setExtracted] = useState(null)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+  const [progress, setProgress] = useState([])
+  const [progressCount, setProgressCount] = useState(0)
+  const progressRef = useRef(null)
+
+  useEffect(() => {
+    if (progressRef.current) {
+      progressRef.current.scrollTop = progressRef.current.scrollHeight
+    }
+  }, [progress])
 
   async function handleExtract() {
     if (!transcript.trim()) return
     setError('')
     setLoading(true)
     setExtracted(null)
+    setProgress([])
+    setProgressCount(0)
 
     try {
       const apiKey = import.meta.env.VITE_OPENAI_API_KEY
@@ -27,6 +44,7 @@ export default function TranscriptUpload({ onDone, currentUser }) {
         },
         body: JSON.stringify({
           model: 'gpt-5-mini',
+          stream: true,
           messages: [
             {
               role: 'system',
@@ -36,7 +54,7 @@ Return ONLY a valid JSON array. No markdown, no explanation, just raw JSON.
 Each item must have:
 - title: string (clear, concise action description)
 - owner: string (person responsible, full name if mentioned, else null)
-- due_date: string in YYYY-MM-DD format if a date or timeframe is mentioned (e.g. "by Friday", "end of month"), else null
+- due_date: string in YYYY-MM-DD format if a date or timeframe is mentioned, else null
 - comments: string (any relevant context or notes, else null)
 
 Example output:
@@ -46,21 +64,59 @@ Example output:
               role: 'user',
               content: `Extract all action items from this meeting transcript:\n\n${transcript}`
             }
-          ],
+          ]
         })
       })
 
-      const data = await response.json()
-      if (data.error) throw new Error(data.error.message)
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let fullText = ''
 
-      const raw = data.choices[0].message.content.trim()
-      const cleaned = raw.replace(/```json|```/g, '').trim()
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop()
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          const data = line.slice(6).trim()
+          if (data === '[DONE]') continue
+          try {
+            const json = JSON.parse(data)
+            const delta = json.choices?.[0]?.delta?.content || ''
+            fullText += delta
+
+            // Parse partial JSON to show progress as actions appear
+            const matches = fullText.match(/\{[^{}]*"title"\s*:\s*"([^"]+)"[^{}]*\}/g)
+            if (matches) {
+              const parsed = []
+              for (const m of matches) {
+                try {
+                  const obj = JSON.parse(m.replace(/,\s*$/, ''))
+                  if (obj.title) parsed.push(obj)
+                } catch {}
+              }
+              if (parsed.length > progressCount) {
+                setProgressCount(parsed.length)
+                setProgress(parsed.map(p => p.title))
+              }
+            }
+          } catch {}
+        }
+      }
+
+      const cleaned = fullText.replace(/```json|```/g, '').trim()
       const actions = JSON.parse(cleaned)
       setExtracted(actions)
     } catch (err) {
       setError('Failed to extract actions. Check your API key or try again. ' + err.message)
     }
     setLoading(false)
+    setProgress([])
   }
 
   async function handleSave() {
@@ -117,9 +173,30 @@ Example output:
 
         {error && <div className="error-msg">{error}</div>}
 
-        {!extracted && (
-          <button className="btn-primary full-width" onClick={handleExtract} disabled={loading || !transcript.trim()}>
-            {loading ? 'Extracting actions...' : 'Extract Actions with AI'}
+        {loading && (
+          <div className="progress-box">
+            <div className="progress-header">
+              <span className="progress-label">Extracting actions</span>
+              <span className="progress-count">{progressCount} found</span>
+            </div>
+            <div className="progress-bar-track">
+              <div className="progress-bar-fill" style={{ width: progressCount > 0 ? `${Math.min(progressCount * 10, 95)}%` : '15%' }} />
+            </div>
+            {progress.length > 0 && (
+              <div className="progress-log" ref={progressRef}>
+                {progress.map((title, i) => (
+                  <div key={i} className={`progress-item ${i === progress.length - 1 ? 'progress-item-latest' : ''}`}>
+                    <span className="progress-tick">✓</span> {title}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {!extracted && !loading && (
+          <button className="btn-primary full-width" onClick={handleExtract} disabled={!transcript.trim()}>
+            Extract Actions with AI
           </button>
         )}
 
@@ -156,6 +233,36 @@ Example output:
                 </div>
               </div>
             ))}
+
+            <div className="actions-summary">
+              <div className="actions-summary-header">
+                <h4>Action Summary</h4>
+                <button className="btn-secondary small" onClick={() => {
+                  const rows = extracted.map(a =>
+                    `${a.title}\t${a.owner || '-'}\t${formatDate(a.due_date)}`
+                  ).join('\n')
+                  navigator.clipboard.writeText(`Action\tOwner\tDue Date\n${rows}`)
+                }}>Copy for email</button>
+              </div>
+              <table className="summary-table">
+                <thead>
+                  <tr>
+                    <th>Action</th>
+                    <th>Owner</th>
+                    <th>Due Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {extracted.map((a, i) => (
+                    <tr key={i}>
+                      <td>{a.title}</td>
+                      <td>{a.owner || '-'}</td>
+                      <td>{formatDate(a.due_date)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
             <button className="btn-primary full-width" onClick={handleSave} disabled={saving || extracted.length === 0}>
               {saving ? 'Saving to board...' : `Add ${extracted.length} action${extracted.length !== 1 ? 's' : ''} to board`}
