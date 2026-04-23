@@ -54,7 +54,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 
 .card { background: var(--surface); border-radius: var(--radius); padding: 12px; margin-bottom: 8px; box-shadow: var(--shadow); cursor: pointer; border-left: 3px solid transparent; transition: box-shadow 0.15s, transform 0.1s; user-select: none; }
 .card:hover { box-shadow: var(--shadow-md); }
-.card.dragging { box-shadow: 0 8px 24px rgba(0,0,0,0.15); transform: rotate(1deg); }
+.card.dragging { box-shadow: 0 8px 24px rgba(0,0,0,0.15); transform: rotate(1deg); opacity: 1 !important; }
 .card.overdue { border-left-color: var(--red); }
 .card.due-soon { border-left-color: #f59e0b; }
 .card.on-track { border-left-color: #22c55e; }
