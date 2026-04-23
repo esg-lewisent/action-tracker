@@ -46,7 +46,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .filter-select:focus { border-color: var(--brand); }
 
 .board { display: flex; gap: 16px; padding: 0 24px; align-items: flex-start; }
-.column { background: var(--col-bg); border-radius: 10px; width: 600px; min-width: 600px; padding: 12px; transition: background 0.15s; }
+.column { background: var(--col-bg); border-radius: 10px; width: 600px; min-width: 600px; padding: 12px; transition: background 0.15s; min-height: 400px; }
 .column.drag-over { background: #dde0e8; }
 .column-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; padding: 0 4px; }
 .column-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; }
