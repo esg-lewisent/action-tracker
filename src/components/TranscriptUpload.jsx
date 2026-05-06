@@ -58,6 +58,18 @@ export default function TranscriptUpload({ onDone, currentUser }) {
       const apiKey = import.meta.env.VITE_OPENAI_API_KEY
       const today = new Date().toISOString().split('T')[0]
 
+      const systemPrompt = "You are an assistant that extracts action items from meeting transcripts.\n" +
+        "Today's date is " + today + ".\n" +
+        "Return ONLY a valid JSON object with two keys:\n" +
+        "1. \"client\": string or null - the client/company name this meeting relates to, inferred from context. Set to null if not clearly identifiable.\n" +
+        "2. \"actions\": array of action objects, each with:\n" +
+        "   - title: string (clear, concise action description)\n" +
+        "   - owners: array of strings (all people responsible, full names if mentioned, else empty array [])\n" +
+        "   - due_date: string in YYYY-MM-DD format if a date or timeframe is mentioned, else null\n" +
+        "   - comments: string (any relevant context or notes, else null)\n\n" +
+        "Example output:\n" +
+        "{\"client\":\"Acme Corp\",\"actions\":[{\"title\":\"Send pricing deck\",\"owners\":[\"Lewis\",\"Jane\"],\"due_date\":\"2026-04-25\",\"comments\":\"Include enterprise tier\"}]}"
+
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
@@ -65,21 +77,7 @@ export default function TranscriptUpload({ onDone, currentUser }) {
           model: 'gpt-5-mini',
           stream: true,
           messages: [
-            {
-              role: 'system',
-              content: `You are an assistant that extracts action items from meeting transcripts.
-Today's date is ${today}.
-Return ONLY a valid JSON object with two keys:
-1. "client": string or null - the client/company name this meeting relates to, inferred from context. Set to null if not clearly identifiable.
-2. "actions": array of action objects, each with:
-   - title: string (clear, concise action description)
-   - owners: array of strings (all people responsible, full names if mentioned, else empty array [])
-   - due_date: string in YYYY-MM-DD format if a date or timeframe is mentioned, else null
-   - comments: string (any relevant context or notes, else null)
-
-Example output:
-{"client":"Acme Corp","actions":[{"title":"Send pricing deck","owners":["Lewis","Jane"],"due_date":"2026-04-25","comments":"Include enterprise tier"}]}
-            },
+            { role: 'system', content: systemPrompt },
             { role: 'user', content: `Extract all action items from this meeting transcript:\n\n${transcript}` }
           ]
         })
@@ -264,17 +262,17 @@ Example output:
               <div className="actions-summary-header">
                 <h4>Action Summary</h4>
                 <button className="btn-secondary small" onClick={() => {
-                  const rows = extracted.actions.map(a => `${a.title}\t${a.owner || '-'}\t${formatDate(a.due_date)}`).join('\n')
-                  navigator.clipboard.writeText(`Action\tOwner\tDue Date\n${rows}`)
+                  const rows = extracted.actions.map(a => `${a.title}\t${(a.owners || []).join(', ') || '-'}\t${formatDate(a.due_date)}`).join('\n')
+                  navigator.clipboard.writeText(`Action\tOwners\tDue Date\n${rows}`)
                 }}>Copy for email</button>
               </div>
               <table className="summary-table">
                 <thead>
-                  <tr><th>Action</th><th>Owner</th><th>Due Date</th></tr>
+                  <tr><th>Action</th><th>Owners</th><th>Due Date</th></tr>
                 </thead>
                 <tbody>
                   {extracted.actions.map((a, i) => (
-                    <tr key={i}><td>{a.title}</td><td>{a.owner || '-'}</td><td>{formatDate(a.due_date)}</td></tr>
+                    <tr key={i}><td>{a.title}</td><td>{(a.owners || []).join(', ') || '-'}</td><td>{formatDate(a.due_date)}</td></tr>
                   ))}
                 </tbody>
               </table>
