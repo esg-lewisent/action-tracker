@@ -1,9 +1,63 @@
 import { useState } from 'react'
 import { supabase } from '../supabase'
 
+function OwnerTagInput({ owners, onChange, suggestions }) {
+  const [input, setInput] = useState('')
+  const [showSuggestions, setShowSuggestions] = useState(false)
+
+  const filtered = suggestions.filter(s =>
+    s.toLowerCase().includes(input.toLowerCase()) && !owners.includes(s)
+  )
+
+  function addOwner(name) {
+    const trimmed = name.trim()
+    if (trimmed && !owners.includes(trimmed)) onChange([...owners, trimmed])
+    setInput('')
+    setShowSuggestions(false)
+  }
+
+  function removeOwner(name) {
+    onChange(owners.filter(o => o !== name))
+  }
+
+  function handleKeyDown(e) {
+    if (e.key === 'Enter' && input.trim()) { e.preventDefault(); addOwner(input) }
+    if (e.key === 'Backspace' && !input && owners.length > 0) removeOwner(owners[owners.length - 1])
+  }
+
+  return (
+    <div className="owner-tag-input" style={{ position: 'relative' }}>
+      <div className="owner-tags-container">
+        {owners.map(o => (
+          <span key={o} className="owner-tag">
+            {o}
+            <button onClick={() => removeOwner(o)} className="owner-tag-remove">✕</button>
+          </span>
+        ))}
+        <input
+          value={input}
+          onChange={e => { setInput(e.target.value); setShowSuggestions(true) }}
+          onKeyDown={handleKeyDown}
+          onFocus={() => setShowSuggestions(true)}
+          onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+          placeholder={owners.length === 0 ? 'Type a name and press Enter' : ''}
+          className="owner-tag-field"
+        />
+      </div>
+      {showSuggestions && input && filtered.length > 0 && (
+        <div className="owner-suggestions">
+          {filtered.map(s => (
+            <div key={s} className="owner-suggestion" onMouseDown={() => addOwner(s)}>{s}</div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function CardModal({ action, owners, clients, boards, onClose, onUpdate }) {
   const [title, setTitle] = useState(action.title)
-  const [owner, setOwner] = useState(action.owner || '')
+  const [cardOwners, setCardOwners] = useState(action.owners || (action.owner ? [action.owner] : []))
   const [client, setClient] = useState(action.client || '')
   const [dueDate, setDueDate] = useState(action.due_date || '')
   const [status, setStatus] = useState(action.status)
@@ -16,7 +70,8 @@ export default function CardModal({ action, owners, clients, boards, onClose, on
     setSaving(true)
     await supabase.from('actions').update({
       title,
-      owner,
+      owner: cardOwners[0] || null,
+      owners: cardOwners,
       client,
       due_date: dueDate || null,
       status,
@@ -35,7 +90,6 @@ export default function CardModal({ action, owners, clients, boards, onClose, on
     onUpdate()
   }
 
-  const ownerOptions = [...new Set([...owners, owner].filter(Boolean))]
   const clientOptions = [...new Set([...clients, client].filter(Boolean))]
   const boardOptions = [...new Set([...(boards || []).map(b => b.name), boardName].filter(Boolean))]
 
@@ -50,10 +104,9 @@ export default function CardModal({ action, owners, clients, boards, onClose, on
         </div>
 
         <div className="field-row">
-          <div className="field">
-            <label>Owner</label>
-            <input list="owner-list" value={owner} onChange={e => setOwner(e.target.value)} placeholder="Type a name" />
-            <datalist id="owner-list">{ownerOptions.map(o => <option key={o} value={o} />)}</datalist>
+          <div className="field" style={{ flex: 2 }}>
+            <label>Owners</label>
+            <OwnerTagInput owners={cardOwners} onChange={setCardOwners} suggestions={owners} />
           </div>
           <div className="field">
             <label>Due Date</label>
