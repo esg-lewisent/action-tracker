@@ -181,3 +181,13 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .owner-suggestions { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: var(--surface); border: 1.5px solid var(--border); border-radius: 6px; box-shadow: var(--shadow-md); z-index: 50; }
 .owner-suggestion { padding: 8px 12px; font-size: 13px; cursor: pointer; }
 .owner-suggestion:hover { background: var(--bg); }
+
+.drop-zone { border: 1.5px solid var(--border); border-radius: 6px; overflow: hidden; transition: border-color 0.15s; }
+.drop-zone-over { border-color: var(--brand); background: #eff4ff; }
+.drop-zone textarea { border: none; border-radius: 0; outline: none; width: 100%; }
+.drop-zone textarea:focus { border: none; }
+.drop-zone-hint { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: var(--bg); border-top: 1px solid var(--border); }
+.drop-zone-label { font-size: 12px; color: var(--brand); cursor: pointer; font-weight: 600; }
+.drop-zone-label:hover { text-decoration: underline; }
+.drop-zone-clear { font-size: 12px; color: var(--text-muted); cursor: pointer; }
+.drop-zone-clear:hover { color: var(--red); }
