@@ -21,6 +21,7 @@ export default function TranscriptUpload({ onDone, currentUser }) {
   const [newBoardName, setNewBoardName] = useState('')
   const [showNewBoard, setShowNewBoard] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [isDragOver, setIsDragOver] = useState(false)
   const progressRef = useRef(null)
 
   useEffect(() => {
@@ -44,6 +45,23 @@ export default function TranscriptUpload({ onDone, currentUser }) {
       setSelectedBoard(data.name)
       setNewBoardName('')
       setShowNewBoard(false)
+    }
+  }
+
+  async function handleFile(file) {
+    if (!file) return
+    if (!file.name.endsWith('.docx')) {
+      setError('Only .docx files are supported. Please upload a Word document.')
+      return
+    }
+    try {
+      setError('')
+      const mammoth = await import('mammoth')
+      const arrayBuffer = await file.arrayBuffer()
+      const result = await mammoth.extractRawText({ arrayBuffer })
+      setTranscript(result.value)
+    } catch (err) {
+      setError('Failed to read file. Make sure it is a valid .docx file.')
     }
   }
 
@@ -196,7 +214,7 @@ export default function TranscriptUpload({ onDone, currentUser }) {
     <div className="transcript-view">
       <div className="transcript-card">
         <h2>New Meeting</h2>
-        <p>Paste your transcript and we'll extract action items automatically.</p>
+        <p>Paste your transcript or upload a .docx file to extract action items automatically.</p>
 
         <div className="field-row">
           <div className="field">
@@ -223,7 +241,36 @@ export default function TranscriptUpload({ onDone, currentUser }) {
 
         <div className="field">
           <label>Transcript</label>
-          <textarea value={transcript} onChange={e => setTranscript(e.target.value)} placeholder="Paste your meeting transcript here..." rows={10} />
+          <div
+            className={`drop-zone ${isDragOver ? 'drop-zone-over' : ''}`}
+            onDragOver={e => { e.preventDefault(); setIsDragOver(true) }}
+            onDragLeave={() => setIsDragOver(false)}
+            onDrop={e => {
+              e.preventDefault()
+              setIsDragOver(false)
+              const file = e.dataTransfer.files[0]
+              if (file) handleFile(file)
+            }}
+          >
+            <textarea
+              value={transcript}
+              onChange={e => setTranscript(e.target.value)}
+              placeholder="Paste your meeting transcript here, or drop a .docx file..."
+              rows={10}
+            />
+            <div className="drop-zone-hint">
+              <label className="drop-zone-label">
+                <input
+                  type="file"
+                  accept=".docx"
+                  style={{ display: 'none' }}
+                  onChange={e => handleFile(e.target.files[0])}
+                />
+                or click to upload a .docx file
+              </label>
+              {transcript && <span className="drop-zone-clear" onClick={() => setTranscript('')}>Clear</span>}
+            </div>
+          </div>
         </div>
 
         {error && <div className="error-msg">{error}</div>}
