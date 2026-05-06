@@ -170,3 +170,14 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 
 .nav-logo { display: flex; align-items: center; gap: 10px; }
 .nav-logo-img { height: 28px; width: auto; }
+
+.owner-tag-input { border: 1.5px solid var(--border); border-radius: 6px; padding: 4px 8px; background: var(--surface); cursor: text; }
+.owner-tag-input:focus-within { border-color: var(--brand); }
+.owner-tags-container { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; min-height: 32px; }
+.owner-tag { display: flex; align-items: center; gap: 4px; background: #ede9fe; color: #6d28d9; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 12px; }
+.owner-tag-remove { background: none; border: none; cursor: pointer; color: #6d28d9; font-size: 10px; padding: 0; line-height: 1; }
+.owner-tag-remove:hover { color: var(--red); }
+.owner-tag-field { border: none; outline: none; font-size: 13px; font-family: inherit; color: var(--text); flex: 1; min-width: 120px; background: transparent; padding: 2px 0; }
+.owner-suggestions { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: var(--surface); border: 1.5px solid var(--border); border-radius: 6px; box-shadow: var(--shadow-md); z-index: 50; }
+.owner-suggestion { padding: 8px 12px; font-size: 13px; cursor: pointer; }
+.owner-suggestion:hover { background: var(--bg); }
