@@ -73,12 +73,12 @@ Return ONLY a valid JSON object with two keys:
 1. "client": string or null - the client/company name this meeting relates to, inferred from context. Set to null if not clearly identifiable.
 2. "actions": array of action objects, each with:
    - title: string (clear, concise action description)
-   - owner: string (person responsible, full name if mentioned, else null)
+   - owners: array of strings (all people responsible, full names if mentioned, else empty array [])
    - due_date: string in YYYY-MM-DD format if a date or timeframe is mentioned, else null
    - comments: string (any relevant context or notes, else null)
 
 Example output:
-{"client":"Acme Corp","actions":[{"title":"Send pricing deck","owner":"Lewis","due_date":"2026-04-25","comments":"Include enterprise tier"}]}`
+{"client":"Acme Corp","actions":[{"title":"Send pricing deck","owners":["Lewis","Jane"],"due_date":"2026-04-25","comments":"Include enterprise tier"}]}
             },
             { role: 'user', content: `Extract all action items from this meeting transcript:\n\n${transcript}` }
           ]
@@ -135,7 +135,8 @@ Example output:
     const source = meetingName.trim() || `Meeting ${new Date().toLocaleDateString('en-GB')}`
     const rows = extracted.actions.map(a => ({
       title: a.title,
-      owner: a.owner || null,
+      owner: (a.owners && a.owners[0]) || null,
+      owners: a.owners || [],
       due_date: a.due_date || null,
       comments: a.comments || null,
       status: 'todo',
@@ -244,8 +245,8 @@ Example output:
                 </div>
                 <div className="field-row">
                   <div className="field">
-                    <label>Owner</label>
-                    <input value={action.owner || ''} onChange={e => updateAction(i, 'owner', e.target.value)} placeholder="Name" />
+                    <label>Owners</label>
+                    <input value={(action.owners || []).join(', ')} onChange={e => updateAction(i, 'owners', e.target.value.split(',').map(s => s.trim()).filter(Boolean))} placeholder="Names, comma separated" />
                   </div>
                   <div className="field">
                     <label>Due Date</label>
