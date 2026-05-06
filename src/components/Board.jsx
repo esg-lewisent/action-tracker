@@ -143,10 +143,14 @@ function Card({ action, onClick }) {
       </div>
       <div className="card-meta">
         <div className="card-owner">
-          <div className="owner-dot" style={{ background: ownerColor(action.owner) }}>
-            {getInitials(action.owner)}
-          </div>
-          <span>{action.owner || 'Unassigned'}</span>
+          {(action.owners && action.owners.length > 0 ? action.owners : action.owner ? [action.owner] : []).map((o, i) => (
+            <div key={i} className="owner-dot" style={{ background: ownerColor(o), marginLeft: i > 0 ? '-6px' : 0, zIndex: 10 - i }}>
+              {getInitials(o)}
+            </div>
+          ))}
+          <span>
+            {(action.owners && action.owners.length > 0 ? action.owners : action.owner ? [action.owner] : ['Unassigned']).join(', ')}
+          </span>
         </div>
         {action.due_date && (
           <span className={`card-date ${status}`}>{formatDate(action.due_date)}</span>
@@ -190,12 +194,13 @@ export default function Board({ actions, boards, onUpdate, onDragStateChange, cu
   const [clientFilters, setClientFilters] = useState([])
   const [boardFilters, setBoardFilters] = useState([])
 
-  const owners = [...new Set(actions.map(a => a.owner).filter(Boolean))].sort()
+  const owners = [...new Set(actions.flatMap(a => a.owners && a.owners.length > 0 ? a.owners : a.owner ? [a.owner] : []))].sort()
   const clients = [...new Set(actions.map(a => a.client).filter(Boolean))].sort()
   const boardNames = [...new Set(actions.map(a => a.board_name).filter(Boolean))].sort()
 
   const filtered = actions.filter(a => {
-    if (ownerFilters.length > 0 && !ownerFilters.includes(a.owner)) return false
+    const actionOwners = a.owners && a.owners.length > 0 ? a.owners : a.owner ? [a.owner] : []
+    if (ownerFilters.length > 0 && !ownerFilters.some(f => actionOwners.includes(f))) return false
     if (clientFilters.length > 0 && !clientFilters.includes(a.client)) return false
     if (boardFilters.length > 0 && !boardFilters.includes(a.board_name)) return false
     return true
