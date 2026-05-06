@@ -20,6 +20,7 @@ export default function TranscriptUpload({ onDone, currentUser }) {
   const [selectedBoard, setSelectedBoard] = useState('')
   const [newBoardName, setNewBoardName] = useState('')
   const [showNewBoard, setShowNewBoard] = useState(false)
+  const [copied, setCopied] = useState(false)
   const progressRef = useRef(null)
 
   useEffect(() => {
@@ -148,6 +149,41 @@ export default function TranscriptUpload({ onDone, currentUser }) {
     onDone()
   }
 
+  async function handleCopyForEmail() {
+    const html = `
+      <table style="border-collapse:collapse;font-family:Arial,sans-serif;font-size:14px;width:100%">
+        <thead>
+          <tr style="background-color:#006AB3;color:#ffffff">
+            <th style="padding:8px 12px;text-align:left;border:1px solid #005a96">Action</th>
+            <th style="padding:8px 12px;text-align:left;border:1px solid #005a96">Owners</th>
+            <th style="padding:8px 12px;text-align:left;border:1px solid #005a96">Due Date</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${extracted.actions.map((a, i) => `
+          <tr style="background-color:${i % 2 === 0 ? '#ffffff' : '#f4f5f7'}">
+            <td style="padding:8px 12px;border:1px solid #e0e4ef">${a.title}</td>
+            <td style="padding:8px 12px;border:1px solid #e0e4ef">${(a.owners || []).join(', ') || '-'}</td>
+            <td style="padding:8px 12px;border:1px solid #e0e4ef">${formatDate(a.due_date)}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`
+    try {
+      const blob = new Blob([html], { type: 'text/html' })
+      const item = new ClipboardItem({ 'text/html': blob })
+      await navigator.clipboard.write([item])
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (err) {
+      // Fallback to plain text if ClipboardItem not supported
+      const plain = `Action\tOwners\tDue Date\n` +
+        extracted.actions.map(a => `${a.title}\t${(a.owners || []).join(', ') || '-'}\t${formatDate(a.due_date)}`).join('\n')
+      await navigator.clipboard.writeText(plain)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }
+
   function updateAction(index, field, value) {
     setExtracted(prev => ({ ...prev, actions: prev.actions.map((item, i) => i === index ? { ...item, [field]: value } : item) }))
   }
@@ -261,10 +297,9 @@ export default function TranscriptUpload({ onDone, currentUser }) {
             <div className="actions-summary">
               <div className="actions-summary-header">
                 <h4>Action Summary</h4>
-                <button className="btn-secondary small" onClick={() => {
-                  const rows = extracted.actions.map(a => `${a.title}\t${(a.owners || []).join(', ') || '-'}\t${formatDate(a.due_date)}`).join('\n')
-                  navigator.clipboard.writeText(`Action\tOwners\tDue Date\n${rows}`)
-                }}>Copy for email</button>
+                <button className="btn-secondary small" onClick={handleCopyForEmail}>
+                  {copied ? 'Copied!' : 'Copy for email'}
+                </button>
               </div>
               <table className="summary-table">
                 <thead>
@@ -272,7 +307,11 @@ export default function TranscriptUpload({ onDone, currentUser }) {
                 </thead>
                 <tbody>
                   {extracted.actions.map((a, i) => (
-                    <tr key={i}><td>{a.title}</td><td>{(a.owners || []).join(', ') || '-'}</td><td>{formatDate(a.due_date)}</td></tr>
+                    <tr key={i}>
+                      <td>{a.title}</td>
+                      <td>{(a.owners || []).join(', ') || '-'}</td>
+                      <td>{formatDate(a.due_date)}</td>
+                    </tr>
                   ))}
                 </tbody>
               </table>
