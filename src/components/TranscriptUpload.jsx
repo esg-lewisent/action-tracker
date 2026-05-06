@@ -61,15 +61,14 @@ export default function TranscriptUpload({ onDone, currentUser }) {
 
       const systemPrompt = "You are an assistant that extracts action items from meeting transcripts.\n" +
         "Today's date is " + today + ".\n" +
-        "Return ONLY a valid JSON object with two keys:\n" +
-        "1. \"client\": string or null - the client/company name this meeting relates to, inferred from context. Set to null if not clearly identifiable.\n" +
-        "2. \"actions\": array of action objects, each with:\n" +
+        "Return ONLY a valid JSON array of action objects. Each action must have:\n" +
         "   - title: string (clear, concise action description)\n" +
+        "   - client: string or null (the client or company this specific action relates to, inferred from context. Set to null if not clearly identifiable)\n" +
         "   - owners: array of strings (all people responsible, full names if mentioned, else empty array [])\n" +
         "   - due_date: string in YYYY-MM-DD format if a date or timeframe is mentioned, else null\n" +
         "   - comments: string (any relevant context or notes, else null)\n\n" +
         "Example output:\n" +
-        "{\"client\":\"Acme Corp\",\"actions\":[{\"title\":\"Send pricing deck\",\"owners\":[\"Lewis\",\"Jane\"],\"due_date\":\"2026-04-25\",\"comments\":\"Include enterprise tier\"}]}"
+        "[{\"title\":\"Send pricing deck\",\"client\":\"Acme Corp\",\"owners\":[\"Lewis\",\"Jane\"],\"due_date\":\"2026-04-25\",\"comments\":\"Include enterprise tier\"},{\"title\":\"Book onboarding call\",\"client\":\"Beta Ltd\",\"owners\":[\"Sarah\"],\"due_date\":null,\"comments\":null}]"
 
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -120,7 +119,7 @@ export default function TranscriptUpload({ onDone, currentUser }) {
 
       const cleaned = fullText.replace(/```json|```/g, '').trim()
       const result = JSON.parse(cleaned)
-      setExtracted({ client: result.client || '', actions: result.actions || [] })
+      setExtracted({ actions: Array.isArray(result) ? result : [] })
     } catch (err) {
       setError('Failed to extract actions. Check your API key or try again. ' + err.message)
     }
@@ -141,7 +140,7 @@ export default function TranscriptUpload({ onDone, currentUser }) {
       status: 'todo',
       source_meeting: source,
       board_name: selectedBoard || null,
-      client: extracted.client || null,
+      client: a.client || null,
       created_by: currentUser.id
     }))
     await supabase.from('actions').insert(rows)
@@ -155,6 +154,7 @@ export default function TranscriptUpload({ onDone, currentUser }) {
         <thead>
           <tr style="background-color:#006AB3;color:#ffffff">
             <th style="padding:8px 12px;text-align:left;border:1px solid #005a96">Action</th>
+            <th style="padding:8px 12px;text-align:left;border:1px solid #005a96">Client</th>
             <th style="padding:8px 12px;text-align:left;border:1px solid #005a96">Owners</th>
             <th style="padding:8px 12px;text-align:left;border:1px solid #005a96">Due Date</th>
           </tr>
@@ -163,6 +163,7 @@ export default function TranscriptUpload({ onDone, currentUser }) {
           ${extracted.actions.map((a, i) => `
           <tr style="background-color:${i % 2 === 0 ? '#ffffff' : '#f4f5f7'}">
             <td style="padding:8px 12px;border:1px solid #e0e4ef">${a.title}</td>
+            <td style="padding:8px 12px;border:1px solid #e0e4ef">${a.client || '-'}</td>
             <td style="padding:8px 12px;border:1px solid #e0e4ef">${(a.owners || []).join(', ') || '-'}</td>
             <td style="padding:8px 12px;border:1px solid #e0e4ef">${formatDate(a.due_date)}</td>
           </tr>`).join('')}
@@ -175,9 +176,8 @@ export default function TranscriptUpload({ onDone, currentUser }) {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch (err) {
-      // Fallback to plain text if ClipboardItem not supported
-      const plain = `Action\tOwners\tDue Date\n` +
-        extracted.actions.map(a => `${a.title}\t${(a.owners || []).join(', ') || '-'}\t${formatDate(a.due_date)}`).join('\n')
+      const plain = `Action\tClient\tOwners\tDue Date\n` +
+        extracted.actions.map(a => `${a.title}\t${a.client || '-'}\t${(a.owners || []).join(', ') || '-'}\t${formatDate(a.due_date)}`).join('\n')
       await navigator.clipboard.writeText(plain)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
@@ -262,11 +262,6 @@ export default function TranscriptUpload({ onDone, currentUser }) {
               <button className="btn-secondary small" onClick={() => setExtracted(null)}>Re-extract</button>
             </div>
 
-            <div className="field">
-              <label>Client (inferred from transcript)</label>
-              <input value={extracted.client || ''} onChange={e => setExtracted(prev => ({ ...prev, client: e.target.value }))} placeholder="Client name or leave blank" />
-            </div>
-
             {extracted.actions.map((action, i) => (
               <div key={i} className="extracted-card">
                 <div className="extracted-card-header">
@@ -287,9 +282,15 @@ export default function TranscriptUpload({ onDone, currentUser }) {
                     <input type="date" value={action.due_date || ''} onChange={e => updateAction(i, 'due_date', e.target.value)} />
                   </div>
                 </div>
-                <div className="field">
-                  <label>Comments</label>
-                  <input value={action.comments || ''} onChange={e => updateAction(i, 'comments', e.target.value)} placeholder="Optional notes" />
+                <div className="field-row">
+                  <div className="field">
+                    <label>Client</label>
+                    <input value={action.client || ''} onChange={e => updateAction(i, 'client', e.target.value)} placeholder="Client name or leave blank" />
+                  </div>
+                  <div className="field">
+                    <label>Comments</label>
+                    <input value={action.comments || ''} onChange={e => updateAction(i, 'comments', e.target.value)} placeholder="Optional notes" />
+                  </div>
                 </div>
               </div>
             ))}
@@ -303,12 +304,13 @@ export default function TranscriptUpload({ onDone, currentUser }) {
               </div>
               <table className="summary-table">
                 <thead>
-                  <tr><th>Action</th><th>Owners</th><th>Due Date</th></tr>
+                  <tr><th>Action</th><th>Client</th><th>Owners</th><th>Due Date</th></tr>
                 </thead>
                 <tbody>
                   {extracted.actions.map((a, i) => (
                     <tr key={i}>
                       <td>{a.title}</td>
+                      <td>{a.client || '-'}</td>
                       <td>{(a.owners || []).join(', ') || '-'}</td>
                       <td>{formatDate(a.due_date)}</td>
                     </tr>
